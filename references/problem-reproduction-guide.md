@@ -64,7 +64,7 @@ badcase 至少包含：
 - 请求接口：例如 `/v1/chat/completions` 或 `/v1/completions`。
 - 请求 payload：包括 `model`、prompt/messages、`temperature`、`top_p`、`max_tokens`、seed、stream 等参数。
 - 期望现象：错误输出、首个异常 token、logits 偏差、崩溃栈或与参考输出的不一致点。
-- 参考结果：CPU、GPU、原生 vLLM、历史正确版本或用户提供的正确输出。
+- 参考结果或无 golden 说明：若有 CPU、GPU、原生 vLLM、历史正确版本或用户提供的正确输出，记录为参考结果；若没有 golden，记录无 golden 状态和计划采用的自洽定位依据。
 - 复现命令或脚本：确保后续每一轮可以原样重放。
 - 本轮服务日志路径：例如 `/workspace/log/log-N.log`。
 
