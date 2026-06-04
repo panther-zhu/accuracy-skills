@@ -1,0 +1,7 @@
+interface:
+  display_name: "vLLM-Ascend 精度定位"
+  short_description: "循环定位 vLLM-Ascend 精度问题"
+  default_prompt: "使用 $accuary-skills 拉起服务、复现 vLLM-Ascend 精度问题、查看日志并指导代码修改。"
+
+policy:
+  allow_implicit_invocation: true
