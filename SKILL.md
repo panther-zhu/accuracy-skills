@@ -48,7 +48,7 @@ pip show vllm-ascend
 启动脚本中的关键固定信息包括：
 
 - 网卡：`enp162s0f0`，脚本会先检查该网卡是否存在。
-- 模型路径：`/mnt/weight/DeepSeek-V4-Flash-w8a8-mtp`。
+- 模型路径：`/mnt/weight/xxx`。
 - 服务名：`ds`。
 - 服务地址：`0.0.0.0:7000`。
 - 关键并行参数：`data-parallel-size=2`、`data-parallel-size-local=2`、`tensor-parallel-size=8`、`enable-expert-parallel`。
