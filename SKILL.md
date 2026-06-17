@@ -113,6 +113,8 @@ curl -sS -w '\nHTTP_STATUS=%{http_code}\n' http://127.0.0.1:7000/v1/models
 - 启动结果。
 - 采用的成功判定依据。
 
+记录格式优先复制并填写：[references/run-record-template.md](references/run-record-template.md)。
+
 ## 第二步：复现问题
 
 先读取并遵循问题复现指导：[references/problem-reproduction-guide.md](references/problem-reproduction-guide.md)。该文件是本技能的问题复现事实来源；它与服务启动指导隔离，不要为了开启复现条件而直接修改 `service-startup-guide.md`。
@@ -164,6 +166,8 @@ badcase 至少包含：
 - 参考结果或无 golden 说明：若有 CPU、GPU、原生 vLLM、历史正确版本或用户提供的正确输出，记录为参考结果；若没有 golden，记录无 golden 状态和计划采用的自洽定位依据。
 - 复现命令或脚本：确保后续每一轮可以原样重放。
 - 本轮服务日志路径：例如 `/workspace/log/log-N.log`。
+
+badcase 记录格式优先复制并填写：[references/badcase-template.md](references/badcase-template.md)。
 
 整理 badcase 时固定所有会影响输出的参数。采样类请求优先设置确定性参数，例如固定 seed、使用低温或贪心解码；若问题只在采样下出现，保留原采样参数并明确记录。
 
@@ -219,6 +223,8 @@ badcase 至少包含：
 - 每步 topk token id 和 topk logits 或 logprobs。
 - 首个分歧 token 的 step。
 - 必要的 hidden_states 或中间 tensor dump。
+
+保存 dump metadata 时优先复制并填写：[references/dump-metadata-template.json](references/dump-metadata-template.json)。
 
 ### 3.2 逐层 dump 定位
 

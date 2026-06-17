@@ -152,6 +152,8 @@ ps -ef | grep "VLLM" | grep -v grep | awk '{print $2}' | xargs -t -i kill -9 {}
 
 ## 7. 本轮启动记录
 
+记录格式优先复制并填写：[run-record-template.md](run-record-template.md)。
+
 - 启动时间：`<每轮启动时填写>`
 - 执行人或执行代理：`<每轮启动时填写>`
 - 实际执行命令：`<每轮启动时填写>`

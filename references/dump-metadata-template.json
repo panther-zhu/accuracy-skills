@@ -1,0 +1,88 @@
+{
+  "schema_version": "accuracy-dump-metadata-v1",
+  "run_id": "",
+  "created_at": "",
+  "executor": "",
+  "badcase": {
+    "name": "",
+    "request_interface": "",
+    "request_command": "",
+    "request_payload": {},
+    "service_log_path": "",
+    "response_path": "",
+    "expected_behavior": "",
+    "observed_behavior": ""
+  },
+  "environment": {
+    "vllm_ascend_repo": "",
+    "tested_branch": "",
+    "tested_commit": "",
+    "diff_summary": "",
+    "model_path": "",
+    "served_model_name": "",
+    "dtype": "",
+    "quantization": "",
+    "tensor_parallel_size": "",
+    "data_parallel_size": "",
+    "data_parallel_size_local": "",
+    "enable_expert_parallel": "",
+    "deterministic_enabled": false,
+    "startup_script": "/workspace/sh/vllm.sh",
+    "startup_log": ""
+  },
+  "comparison": {
+    "golden_available": false,
+    "golden_source": "",
+    "golden_branch": "",
+    "golden_commit": "",
+    "golden_environment": "",
+    "golden_request_payload_matched": false,
+    "no_golden_evidence": ""
+  },
+  "dump_config": {
+    "dump_root": "/workspace/log/accuracy_dumps/<run_id>/",
+    "dump_switch": "VLLM_ASCEND_ACCURACY_DUMP",
+    "dump_schema_version": "v1",
+    "topk": 10,
+    "save_full_tensor": false,
+    "save_statistics": true,
+    "save_slices": true
+  },
+  "dump_points": [
+    {
+      "name": "",
+      "stage": "input|embedding|layer|attention|mlp|moe|final_norm|lm_head|logits|sampling|kv_cache",
+      "step": "",
+      "layer_id": "",
+      "rank": "",
+      "device": "",
+      "dtype": "",
+      "shape": "",
+      "file": "",
+      "statistics": {
+        "max_abs_diff": "",
+        "mean_abs_diff": "",
+        "max_rel_diff": "",
+        "cosine_similarity": "",
+        "nan_count": "",
+        "inf_count": "",
+        "min": "",
+        "max": "",
+        "mean": "",
+        "max_diff_position": ""
+      },
+      "notes": ""
+    }
+  ],
+  "results": {
+    "generated_token_ids": [],
+    "topk_token_ids": [],
+    "topk_logits_or_logprobs": [],
+    "first_divergence_step": "",
+    "first_divergence_layer": "",
+    "first_divergence_op": "",
+    "current_hypothesis": "",
+    "evidence_summary": "",
+    "next_validation": ""
+  }
+}

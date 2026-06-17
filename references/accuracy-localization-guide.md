@@ -206,6 +206,8 @@ MLP 或 MoE 相关问题优先 dump：
 - dump 点列表。
 - golden 来源；无 golden 时记录“无 golden”和替代定位依据。
 
+dump metadata 格式优先复制并填写：[dump-metadata-template.json](dump-metadata-template.json)。
+
 ## 6. 对比方法
 
 有 golden 时按以下顺序执行：

@@ -68,6 +68,8 @@ badcase 至少包含：
 - 复现命令或脚本：确保后续每一轮可以原样重放。
 - 本轮服务日志路径：例如 `/workspace/log/log-N.log`。
 
+badcase 记录格式优先复制并填写：[badcase-template.md](badcase-template.md)。
+
 整理 badcase 时固定所有会影响输出的参数。采样类请求优先设置确定性参数，例如固定 seed、使用低温或贪心解码；若问题只在采样下出现，保留原采样参数并明确记录。
 
 ## 4. 发送请求复现
