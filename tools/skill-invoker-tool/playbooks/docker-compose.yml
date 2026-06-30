@@ -1,0 +1,49 @@
+---
+- name: Run Docker Compose actions from a project directory
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  vars:
+    allowed_compose_actions:
+      - ps
+      - config
+      - pull
+      - build
+      - up
+      - down
+      - restart
+      - logs
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - compose_project_dir is defined
+          - compose_project_dir | length > 0
+          - compose_action is defined
+          - compose_action in allowed_compose_actions
+          - compose_args | default([]) is sequence
+          - compose_files | default([]) is sequence
+        fail_msg: "Pass -e compose_project_dir=<dir> -e compose_action=<action>. Allowed actions: {{ allowed_compose_actions | join(', ') }}."
+
+    - name: Build compose file options
+      ansible.builtin.set_fact:
+        compose_file_options: "{{ (compose_file_options | default([])) + ['-f', item] }}"
+      loop: "{{ compose_files | default([]) }}"
+
+    - name: Run compose action
+      ansible.builtin.command:
+        argv: "{{ [docker_cli | default('docker'), 'compose'] + (compose_file_options | default([])) + [compose_action] + (compose_args | default([])) }}"
+        chdir: "{{ compose_project_dir }}"
+      register: docker_compose_result
+      changed_when: compose_action not in ['ps', 'config', 'logs']
+
+    - name: Show stdout
+      ansible.builtin.debug:
+        var: docker_compose_result.stdout_lines
+
+    - name: Show stderr
+      ansible.builtin.debug:
+        var: docker_compose_result.stderr_lines
+      when: docker_compose_result.stderr | length > 0

@@ -1,0 +1,51 @@
+---
+- name: Tail a log file inside the target container
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - tail_lines | default(200) | int >= 0
+        fail_msg: "Optional tail_lines must be a non-negative integer."
+
+    - name: Locate latest service log when log_file is omitted
+      ansible.builtin.command:
+        argv:
+          - bash
+          - -c
+          - "ls -1t {{ service_log_dir | quote }}/log-*.log 2>/dev/null | head -n 1"
+      register: latest_log_lookup
+      changed_when: false
+      when: log_file is not defined
+
+    - name: Build effective log file
+      ansible.builtin.set_fact:
+        effective_log_file: "{{ log_file | default(latest_log_lookup.stdout) }}"
+
+    - name: Validate effective log file
+      ansible.builtin.assert:
+        that:
+          - effective_log_file is defined
+          - effective_log_file | length > 0
+          - effective_log_file is match('^/')
+          - effective_log_file is not search('(^|/)\\.\\.(/|$)')
+        fail_msg: "Pass log_file=<absolute-path>, or ensure service_log_dir contains log-*.log."
+
+    - name: Tail log
+      ansible.builtin.command:
+        argv:
+          - tail
+          - -n
+          - "{{ tail_lines | default(200) | string }}"
+          - "{{ effective_log_file }}"
+      register: tail_result
+      changed_when: false
+
+    - name: Show log tail
+      ansible.builtin.debug:
+        msg:
+          log_file: "{{ effective_log_file }}"
+          lines: "{{ tail_result.stdout_lines }}"

@@ -1,0 +1,34 @@
+---
+- name: Clone or update Git repository
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - repo_url is defined
+          - repo_url | length > 0
+          - repo_dest is defined
+          - repo_dest | length > 0
+        fail_msg: "Pass -e repo_url=<git-url> -e repo_dest=<target-dir>."
+
+    - name: Create repository parent directory
+      ansible.builtin.file:
+        path: "{{ repo_dest | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Clone or update repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        version: "{{ repo_version | default('HEAD') }}"
+        update: "{{ repo_update | default(true) }}"
+        force: "{{ repo_force | default(false) }}"
+        accept_hostkey: "{{ repo_accept_hostkey | default(true) }}"
+      register: repo_checkout
+      retries: "{{ repo_retries | default(5) }}"
+      delay: "{{ repo_retry_delay | default(15) }}"
+      until: repo_checkout is succeeded

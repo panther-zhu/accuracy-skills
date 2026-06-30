@@ -1,0 +1,53 @@
+---
+- name: Backup file on managed hosts
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - path is defined
+          - path | length > 0
+        fail_msg: "Pass -e path=<file-to-backup>. Optional: -e backup_dir=<dir>."
+
+    - name: Check source file
+      ansible.builtin.stat:
+        path: "{{ path }}"
+      register: source_file
+
+    - name: Fail if source file is missing
+      ansible.builtin.fail:
+        msg: "Source file does not exist: {{ path }}"
+      when:
+        - not source_file.stat.exists
+        - fail_if_missing | default(true) | bool
+
+    - name: Create backup directory
+      ansible.builtin.file:
+        path: "{{ backup_dir | default(path | dirname) }}"
+        state: directory
+        mode: "{{ backup_dir_mode | default('0755') }}"
+      when: source_file.stat.exists
+
+    - name: Build backup path
+      ansible.builtin.set_fact:
+        backup_path: >-
+          {{ backup_dir | default(path | dirname) }}/{{ path | basename }}.{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak
+      when: source_file.stat.exists
+
+    - name: Copy backup
+      ansible.builtin.copy:
+        src: "{{ path }}"
+        dest: "{{ backup_path }}"
+        remote_src: true
+        mode: "{{ backup_mode | default(source_file.stat.mode) }}"
+      when: source_file.stat.exists
+      register: backup_result
+
+    - name: Show backup result
+      ansible.builtin.debug:
+        msg:
+          changed: "{{ backup_result.changed | default(false) }}"
+          backup_path: "{{ backup_path | default('') }}"

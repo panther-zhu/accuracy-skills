@@ -1,0 +1,7 @@
+ssh/
+.venv/
+.ansible/
+known_hosts
+*.retry
+payload/
+templates/

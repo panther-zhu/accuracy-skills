@@ -1,0 +1,29 @@
+---
+- name: Run shell command
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - allow_unsafe_shell | default(false) | bool
+          - command_to_run is defined
+          - command_to_run | length > 0
+        fail_msg: "This playbook runs arbitrary shell. Pass -e allow_unsafe_shell=true plus command_to_run, or use run-script.yml / docker-*.yml instead."
+
+    - name: Run command
+      ansible.builtin.shell:
+        cmd: "{{ command_to_run }}"
+        chdir: "{{ command_chdir | default(omit) }}"
+      register: command_result
+
+    - name: Show stdout
+      ansible.builtin.debug:
+        var: command_result.stdout_lines
+
+    - name: Show stderr
+      ansible.builtin.debug:
+        var: command_result.stderr_lines
+      when: command_result.stderr | length > 0

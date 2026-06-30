@@ -1,0 +1,31 @@
+---
+- name: Execute a command inside a Docker container
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - container_name is defined
+          - container_name | length > 0
+          - exec_argv is defined
+          - exec_argv is sequence
+          - exec_argv | length > 0
+          - docker_exec_options | default([]) is sequence
+        fail_msg: "Pass -e container_name=<container> -e '{\"exec_argv\":[\"cmd\",\"arg\"]}'. Optional docker_exec_options must be a list."
+
+    - name: Execute in container
+      ansible.builtin.command:
+        argv: "{{ [docker_cli | default('docker'), 'exec'] + (docker_exec_options | default([])) + [container_name] + exec_argv }}"
+      register: docker_exec_result
+
+    - name: Show stdout
+      ansible.builtin.debug:
+        var: docker_exec_result.stdout_lines
+
+    - name: Show stderr
+      ansible.builtin.debug:
+        var: docker_exec_result.stderr_lines
+      when: docker_exec_result.stderr | length > 0

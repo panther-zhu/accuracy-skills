@@ -1,0 +1,35 @@
+---
+- name: Search logs inside the target container
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Build grep inputs
+      ansible.builtin.set_fact:
+        effective_grep_paths: "{{ grep_paths | default([service_log_dir, plog_dir]) }}"
+        effective_grep_regex: "{{ grep_regex | default((grep_patterns | default(default_log_patterns)) | map('regex_escape') | join('|')) }}"
+
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - effective_grep_paths is sequence
+          - effective_grep_paths | length > 0
+          - effective_grep_regex | length > 0
+          - grep_max_count | default(50) | int > 0
+        fail_msg: "Pass grep_paths and either grep_patterns or grep_regex."
+
+    - name: Search logs
+      ansible.builtin.command:
+        argv: "{{ ['grep', '-RInE', '-m', (grep_max_count | default(50) | string), effective_grep_regex] + effective_grep_paths }}"
+      register: grep_result
+      changed_when: false
+      failed_when: grep_result.rc not in [0, 1, 2]
+
+    - name: Show matches
+      ansible.builtin.debug:
+        msg:
+          regex: "{{ effective_grep_regex }}"
+          paths: "{{ effective_grep_paths }}"
+          matches: "{{ grep_result.stdout_lines }}"
+          stderr: "{{ grep_result.stderr_lines | default([]) }}"

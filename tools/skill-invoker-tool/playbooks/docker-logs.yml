@@ -1,0 +1,29 @@
+---
+- name: Show Docker container logs
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - container_name is defined
+          - container_name | length > 0
+          - log_tail | default(200) | int >= 0
+        fail_msg: "Pass -e container_name=<container>. Optional: -e log_tail=200."
+
+    - name: Read container logs
+      ansible.builtin.command:
+        argv: "{{ [docker_cli | default('docker'), 'logs', '--tail', (log_tail | default(200) | string), container_name] }}"
+      register: docker_logs_result
+      changed_when: false
+
+    - name: Show stdout
+      ansible.builtin.debug:
+        var: docker_logs_result.stdout_lines
+
+    - name: Show stderr
+      ansible.builtin.debug:
+        var: docker_logs_result.stderr_lines
+      when: docker_logs_result.stderr | length > 0

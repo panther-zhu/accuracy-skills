@@ -1,0 +1,36 @@
+---
+- name: Manage Docker containers with a small action allowlist
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  vars:
+    allowed_container_actions:
+      - inspect
+      - start
+      - stop
+      - restart
+      - pause
+      - unpause
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - container_action is defined
+          - container_action in allowed_container_actions
+          - container_names is defined
+          - container_names is sequence
+          - container_names | length > 0
+          - docker_container_options | default([]) is sequence
+        fail_msg: "Pass allowed container_action and -e '{\"container_names\":[\"name\"]}'. Allowed actions: {{ allowed_container_actions | join(', ') }}."
+
+    - name: Run container action
+      ansible.builtin.command:
+        argv: "{{ [docker_cli | default('docker'), container_action] + (docker_container_options | default([])) + container_names }}"
+      register: docker_container_result
+      changed_when: container_action != 'inspect'
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: docker_container_result.stdout_lines

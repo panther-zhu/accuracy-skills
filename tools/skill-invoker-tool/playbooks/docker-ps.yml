@@ -1,0 +1,22 @@
+---
+- name: List Docker containers
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - docker_ps_extra_args | default([]) is sequence
+        fail_msg: "Optional docker_ps_extra_args must be a list, for example -e '{\"docker_ps_extra_args\":[\"--filter\",\"status=running\"]}'."
+
+    - name: List containers
+      ansible.builtin.command:
+        argv: "{{ [docker_cli | default('docker'), 'ps'] + ((docker_ps_all | default(true) | bool) | ternary(['--all'], [])) + (docker_ps_extra_args | default([])) }}"
+      register: docker_ps_result
+      changed_when: false
+
+    - name: Show containers
+      ansible.builtin.debug:
+        var: docker_ps_result.stdout_lines

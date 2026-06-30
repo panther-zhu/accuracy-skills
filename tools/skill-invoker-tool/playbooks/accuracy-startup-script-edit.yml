@@ -1,0 +1,90 @@
+---
+- name: Edit vLLM startup script inside the target container
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  vars:
+    default_startup_env:
+      HCCL_DETERMINISTIC: "true"
+
+  tasks:
+    - name: Build requested startup environment
+      ansible.builtin.set_fact:
+        requested_startup_env: "{{ startup_env | default(default_startup_env) }}"
+
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - startup_script is defined
+          - startup_script | length > 0
+          - startup_script is match('^/')
+          - startup_script is not search('(^|/)\\.\\.(/|$)')
+          - requested_startup_env is mapping
+        fail_msg: "Pass startup_script=<absolute-path> and optional startup_env as a mapping."
+
+    - name: Ensure startup and log directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ startup_script_dir | default(startup_script | dirname) }}"
+        - "{{ service_log_dir | default('/workspace/log') }}"
+      when: create_startup_dirs | default(true) | bool
+
+    - name: Check startup script
+      ansible.builtin.stat:
+        path: "{{ startup_script }}"
+      register: startup_script_stat
+
+    - name: Fail if startup script is missing
+      ansible.builtin.fail:
+        msg: "Startup script does not exist: {{ startup_script }}"
+      when:
+        - fail_if_missing_startup_script | default(true) | bool
+        - not startup_script_stat.stat.exists
+
+    - name: Build startup backup path
+      ansible.builtin.set_fact:
+        startup_backup_path: "{{ startup_script }}.{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak"
+      when: startup_script_stat.stat.exists
+
+    - name: Backup startup script
+      ansible.builtin.copy:
+        src: "{{ startup_script }}"
+        dest: "{{ startup_backup_path }}"
+        remote_src: true
+        mode: "{{ startup_script_stat.stat.mode | default('0755') }}"
+      when: startup_script_stat.stat.exists
+
+    - name: Set startup environment variables
+      ansible.builtin.lineinfile:
+        path: "{{ startup_script }}"
+        regexp: "^\\s*#?\\s*export\\s+{{ item.key | regex_escape }}="
+        line: "export {{ item.key }}={{ item.value }}"
+        insertbefore: "{{ startup_env_insertbefore | default('^exec\\s+vllm\\s+') }}"
+        create: "{{ create_startup_script | default(false) }}"
+        backup: false
+      loop: "{{ requested_startup_env | dict2items }}"
+      register: startup_env_result
+
+    - name: Show startup script diff
+      ansible.builtin.command:
+        argv:
+          - diff
+          - -u
+          - "{{ startup_backup_path }}"
+          - "{{ startup_script }}"
+      register: startup_diff
+      changed_when: false
+      failed_when: startup_diff.rc not in [0, 1]
+      when: startup_script_stat.stat.exists
+
+    - name: Show edit result
+      ansible.builtin.debug:
+        msg:
+          changed: "{{ startup_env_result.changed }}"
+          startup_script: "{{ startup_script }}"
+          backup_path: "{{ startup_backup_path | default('') }}"
+          diff: "{{ startup_diff.stdout_lines | default([]) }}"

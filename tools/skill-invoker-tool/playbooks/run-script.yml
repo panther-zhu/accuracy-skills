@@ -1,0 +1,47 @@
+---
+- name: Run an approved script from a controlled directory
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - script_root is defined
+          - script_root | length > 0
+          - script_name is defined
+          - script_name | length > 0
+          - script_name is not match('^/')
+          - script_name is not search('(^|/)\\.\\.(/|$)')
+          - script_args | default([]) is sequence
+        fail_msg: "Pass -e script_root=<dir> -e script_name=<relative-script>. Optional: -e '{\"script_args\":[\"arg1\"]}'."
+
+    - name: Build script path
+      ansible.builtin.set_fact:
+        script_path: "{{ script_root | regex_replace('/+$', '') }}/{{ script_name }}"
+
+    - name: Check script file
+      ansible.builtin.stat:
+        path: "{{ script_path }}"
+      register: script_stat
+
+    - name: Fail if script is missing or not executable
+      ansible.builtin.fail:
+        msg: "Script must exist and be executable: {{ script_path }}"
+      when: not script_stat.stat.exists or not script_stat.stat.executable
+
+    - name: Run script
+      ansible.builtin.command:
+        argv: "{{ [script_path] + (script_args | default([])) }}"
+        chdir: "{{ script_root }}"
+      register: script_result
+
+    - name: Show stdout
+      ansible.builtin.debug:
+        var: script_result.stdout_lines
+
+    - name: Show stderr
+      ansible.builtin.debug:
+        var: script_result.stderr_lines
+      when: script_result.stderr | length > 0

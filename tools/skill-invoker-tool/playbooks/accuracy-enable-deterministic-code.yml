@@ -1,0 +1,156 @@
+---
+- name: Enable deterministic algorithms in vllm-ascend code
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Build target code file path
+      ansible.builtin.set_fact:
+        deterministic_code_file: "{{ code_file | default(vllm_ascend_repo ~ '/vllm_ascend/worker/model_runner_v1.py') }}"
+
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - vllm_ascend_repo is defined
+          - vllm_ascend_repo | length > 0
+          - deterministic_code_file is match('^' ~ (vllm_ascend_repo | regex_escape) ~ '(/|$)')
+          - deterministic_code_file is not search('(^|/)\\.\\.(/|$)')
+        fail_msg: "code_file must be inside vllm_ascend_repo."
+
+    - name: Check code file
+      ansible.builtin.stat:
+        path: "{{ deterministic_code_file }}"
+      register: deterministic_code_stat
+
+    - name: Fail if code file is missing
+      ansible.builtin.fail:
+        msg: "Code file does not exist: {{ deterministic_code_file }}"
+      when: not deterministic_code_stat.stat.exists
+
+    - name: Build backup path
+      ansible.builtin.set_fact:
+        deterministic_backup_path: "{{ deterministic_code_file }}.{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak"
+
+    - name: Backup code file
+      ansible.builtin.copy:
+        src: "{{ deterministic_code_file }}"
+        dest: "{{ deterministic_backup_path }}"
+        remote_src: true
+        mode: "{{ deterministic_code_stat.stat.mode | default('0644') }}"
+
+    - name: Install deterministic edit helper
+      ansible.builtin.copy:
+        dest: /tmp/accuracy_enable_deterministic.py
+        mode: "0755"
+        content: |
+          #!/usr/bin/env python3
+          import pathlib
+          import re
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          original = text
+          marker = "torch.use_deterministic_algorithms(True)"
+
+          if not re.search(r"^\s*import\s+torch\s*$", text, re.M):
+              lines = text.splitlines(True)
+              import_lines = [
+                  i for i, line in enumerate(lines)
+                  if re.match(r"^(from|import)\s+", line) and not line.startswith("from __future__")
+              ]
+              future_lines = [
+                  i for i, line in enumerate(lines)
+                  if line.startswith("from __future__")
+              ]
+              insert_at = (max(import_lines) + 1) if import_lines else ((max(future_lines) + 1) if future_lines else 0)
+              lines.insert(insert_at, "import torch\n")
+              text = "".join(lines)
+
+          if marker not in text:
+              lines = text.splitlines(True)
+              class_index = None
+              class_indent = 0
+              for index, line in enumerate(lines):
+                  match = re.match(r"^(\s*)class\s+NPUModelRunner\b", line)
+                  if match:
+                      class_index = index
+                      class_indent = len(match.group(1))
+                      break
+              if class_index is None:
+                  raise SystemExit("NPUModelRunner class not found")
+
+              def_index = None
+              def_indent = 0
+              for index in range(class_index + 1, len(lines)):
+                  line = lines[index]
+                  if line.strip() and len(line) - len(line.lstrip()) <= class_indent and not line.lstrip().startswith("#"):
+                      break
+                  match = re.match(r"^(\s*)def\s+__init__\s*\(", line)
+                  if match:
+                      def_index = index
+                      def_indent = len(match.group(1))
+                      break
+              if def_index is None:
+                  raise SystemExit("NPUModelRunner.__init__ not found")
+
+              paren_balance = 0
+              insert_at = def_index
+              for index in range(def_index, len(lines)):
+                  paren_balance += lines[index].count("(") - lines[index].count(")")
+                  if lines[index].rstrip().endswith(":") and paren_balance <= 0:
+                      insert_at = index + 1
+                      break
+
+              indent = " " * (def_indent + 4)
+              lines.insert(insert_at, f"{indent}{marker}\n")
+              text = "".join(lines)
+
+          if text != original:
+              path.write_text(text)
+              print("changed=true")
+          else:
+              print("changed=false")
+
+    - name: Enable deterministic algorithms
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /tmp/accuracy_enable_deterministic.py
+          - "{{ deterministic_code_file }}"
+      register: deterministic_edit_result
+      changed_when: "'changed=true' in deterministic_edit_result.stdout"
+
+    - name: Show file diff
+      ansible.builtin.command:
+        argv:
+          - diff
+          - -u
+          - "{{ deterministic_backup_path }}"
+          - "{{ deterministic_code_file }}"
+      register: deterministic_file_diff
+      changed_when: false
+      failed_when: deterministic_file_diff.rc not in [0, 1]
+
+    - name: Show repository diff
+      ansible.builtin.command:
+        argv:
+          - git
+          - -C
+          - "{{ vllm_ascend_repo }}"
+          - diff
+          - --
+          - "{{ deterministic_code_file }}"
+      register: deterministic_git_diff
+      changed_when: false
+      failed_when: false
+
+    - name: Show edit result
+      ansible.builtin.debug:
+        msg:
+          changed: "{{ deterministic_edit_result.changed }}"
+          code_file: "{{ deterministic_code_file }}"
+          backup_path: "{{ deterministic_backup_path }}"
+          file_diff: "{{ deterministic_file_diff.stdout_lines | default([]) }}"
+          git_diff: "{{ deterministic_git_diff.stdout_lines | default([]) }}"

@@ -1,0 +1,24 @@
+---
+- name: Show git diff inside the target container
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - repo_path | default(vllm_ascend_repo) is defined
+          - repo_path | default(vllm_ascend_repo) | length > 0
+          - git_diff_paths | default([]) is sequence
+        fail_msg: "Pass repo_path and optional git_diff_paths as a list."
+
+    - name: Show git diff
+      ansible.builtin.command:
+        argv: "{{ ['git', '-C', (repo_path | default(vllm_ascend_repo)), 'diff', '--'] + (git_diff_paths | default([])) }}"
+      register: git_diff_result
+      changed_when: false
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: git_diff_result.stdout_lines

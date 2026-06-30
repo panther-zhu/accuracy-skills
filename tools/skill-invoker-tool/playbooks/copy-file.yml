@@ -1,0 +1,40 @@
+---
+- name: Copy file to managed hosts
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - src is defined
+          - src | length > 0
+          - dest is defined
+          - dest | length > 0
+        fail_msg: "Pass -e src=<local-file> -e dest=<remote-file>."
+
+    - name: Create destination parent directory
+      ansible.builtin.file:
+        path: "{{ dest | dirname }}"
+        state: directory
+        mode: "{{ dest_dir_mode | default('0755') }}"
+      when: create_parent | default(true) | bool
+
+    - name: Copy file
+      ansible.builtin.copy:
+        src: "{{ src }}"
+        dest: "{{ dest }}"
+        owner: "{{ owner | default(omit) }}"
+        group: "{{ group | default(omit) }}"
+        mode: "{{ mode | default(omit) }}"
+        backup: "{{ backup | default(true) }}"
+        force: "{{ force | default(true) }}"
+      register: copy_result
+
+    - name: Show copy result
+      ansible.builtin.debug:
+        msg:
+          changed: "{{ copy_result.changed }}"
+          dest: "{{ copy_result.dest | default(dest) }}"
+          backup_file: "{{ copy_result.backup_file | default('') }}"

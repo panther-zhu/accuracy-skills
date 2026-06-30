@@ -1,0 +1,50 @@
+---
+- name: Check target container prerequisites
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - preflight_required_commands | default([]) is sequence
+          - preflight_required_paths | default([]) is sequence
+        fail_msg: "preflight_required_commands and preflight_required_paths must be lists."
+
+    - name: Check required commands
+      ansible.builtin.command:
+        argv:
+          - bash
+          - -c
+          - "command -v {{ item }}"
+      loop: "{{ preflight_required_commands | default([]) }}"
+      register: command_checks
+      changed_when: false
+
+    - name: Check required paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ preflight_required_paths | default([]) }}"
+      register: path_checks
+
+    - name: Fail if required path is missing
+      ansible.builtin.fail:
+        msg: "Required path is missing in target container: {{ item.item }}"
+      loop: "{{ path_checks.results }}"
+      when:
+        - fail_if_missing_paths | default(false) | bool
+        - not item.stat.exists
+
+    - name: Show command check results
+      ansible.builtin.debug:
+        msg: "{{ item.item }} -> {{ item.stdout | default('missing') }}"
+      loop: "{{ command_checks.results }}"
+
+    - name: Show path check results
+      ansible.builtin.debug:
+        msg:
+          path: "{{ item.item }}"
+          exists: "{{ item.stat.exists }}"
+          isdir: "{{ item.stat.isdir | default(false) }}"
+      loop: "{{ path_checks.results }}"

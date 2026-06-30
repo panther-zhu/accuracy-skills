@@ -1,0 +1,32 @@
+---
+use_become: false
+
+# Default execution model: Ansible connects directly into the target container.
+target_root: /workspace
+vllm_ascend_repo: /workspace/vllm-workspace/vllm-ascend
+vllm_repo: /workspace/vllm-workspace/vllm
+startup_script_dir: /workspace/sh
+plog_dir: /root/ascend/log/debug/plog
+
+preflight_required_commands:
+  - python3
+  - bash
+  - grep
+  - sed
+  - awk
+
+preflight_required_paths:
+  - "{{ target_root }}"
+  - "{{ vllm_ascend_repo }}"
+  - "{{ startup_script_dir }}"
+  - "{{ service_log_dir }}"
+
+default_log_patterns:
+  - HCCL
+  - NPU
+  - ModuleNotFoundError
+  - Application startup failed
+  - Address already in use
+  - timeout
+  - NaN
+  - Inf

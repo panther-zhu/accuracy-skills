@@ -1,0 +1,43 @@
+---
+- name: Edit one line in a file
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - path is defined
+          - path | length > 0
+          - line is defined
+        fail_msg: "Pass -e path=<file> -e line=<line>. Optional: -e regexp=<regex>."
+
+    - name: Ensure parent directory exists
+      ansible.builtin.file:
+        path: "{{ path | dirname }}"
+        state: directory
+        mode: "{{ dest_dir_mode | default('0755') }}"
+      when:
+        - create_parent | default(false) | bool
+
+    - name: Edit line
+      ansible.builtin.lineinfile:
+        path: "{{ path }}"
+        regexp: "{{ regexp | default(omit) }}"
+        line: "{{ line }}"
+        state: "{{ state | default('present') }}"
+        create: "{{ create | default(false) }}"
+        insertafter: "{{ insertafter | default(omit) }}"
+        insertbefore: "{{ insertbefore | default(omit) }}"
+        backup: "{{ backup | default(true) }}"
+        owner: "{{ owner | default(omit) }}"
+        group: "{{ group | default(omit) }}"
+        mode: "{{ mode | default(omit) }}"
+      register: line_result
+
+    - name: Show line edit result
+      ansible.builtin.debug:
+        msg:
+          changed: "{{ line_result.changed }}"
+          backup_file: "{{ line_result.backup | default('') }}"

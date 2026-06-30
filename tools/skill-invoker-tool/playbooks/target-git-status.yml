@@ -1,0 +1,28 @@
+---
+- name: Show git status inside the target container
+  hosts: "{{ target_hosts | default('managed_hosts') }}"
+  gather_facts: false
+  become: "{{ use_become | default(false) }}"
+
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - repo_path | default(vllm_ascend_repo) is defined
+          - repo_path | default(vllm_ascend_repo) | length > 0
+        fail_msg: "Pass repo_path, or define vllm_ascend_repo."
+
+    - name: Show git status
+      ansible.builtin.command:
+        argv:
+          - git
+          - -C
+          - "{{ repo_path | default(vllm_ascend_repo) }}"
+          - status
+          - --short
+      register: git_status_result
+      changed_when: false
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: git_status_result.stdout_lines
